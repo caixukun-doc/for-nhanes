@@ -1,0 +1,46 @@
+from sklearn.linear_model import LinearRegression
+from sklearn.impute import SimpleImputer
+from sklearn.experimental import enable_iterative_imputer
+from sklearn.impute import IterativeImputer
+import numpy as np
+import pandas as pd
+
+# Load the CSV file
+file_path = '/mnt/data/NvxingquchuXYage.csv'
+data = pd.read_csv(file_path)
+
+# Step 1: Simple imputation for all non-target continuous and categorical variables
+all_other_cols = data.columns.difference(['INDFMPIR', 'PAD680'])
+simple_imputer = SimpleImputer(strategy='median')
+data[all_other_cols] = simple_imputer.fit_transform(data[all_other_cols])
+
+# Define the regression imputation function
+def regression_imputation_improved(df, target_col):
+    non_missing = df.dropna(subset=[target_col])
+    missing = df[df[target_col].isnull()]
+    
+    model = LinearRegression()
+    model.fit(non_missing.drop(columns=target_col), non_missing[target_col])
+    
+    predicted_values = model.predict(missing.drop(columns=target_col))
+    df.loc[df[target_col].isnull(), target_col] = predicted_values
+    return df
+
+# Step 2: Perform regression imputation for target continuous variables
+data = regression_imputation_improved(data, 'INDFMPIR')
+data = regression_imputation_improved(data, 'PAD680')
+
+# Step 3: Perform multiple imputation for categorical variables
+categorical_cols = ['DMDEDUC2', 'DMDMARTL', 'ALQ101', 'BPQ020', 'DIQ010', 'CVD']
+imputer = IterativeImputer(max_iter=10, random_state=0)
+data[categorical_cols] = imputer.fit_transform(data[categorical_cols])
+
+# Convert back to integer if they were integers originally
+data[categorical_cols] = data[categorical_cols].apply(lambda x: np.round(x).astype(int))
+
+# Check for any remaining missing values
+remaining_missing_values_final = data[continuous_cols + categorical_cols].isnull().sum()
+
+import ace_tools as tools; tools.display_dataframe_to_user(name="Remaining Missing Values After Final Imputation", dataframe=remaining_missing_values_final)
+
+remaining_missing_values_final
